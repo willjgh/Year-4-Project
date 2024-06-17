@@ -1,0 +1,155 @@
+
+\section{Optimization}
+
+We now introduce the optimization problems used to find the set of reaction rate constants which could have produced the observed data under a given reaction network model. 
+
+As described, given observations of the full state of the system $x \in S$ we use the bootstrap to compute 95\% confidence intervals $[\hat{p}_{L}(x), \hat{p}_{U}(x)]$ for the stationary distribution $p = (p(x))_{x \in S}$, written in vector form as $\hat{p}_{L} \le p \le \hat{p}_{U}$. These bounds together with the system of equations $Qp = 0$ give constraints on the values of the reaction rates $k_{j}$ we wish to infer.
+
+However, the rate matrix Q has dimensions $\vert S \vert \times \vert S \vert$ and $p$ has dimension $\vert S \vert$, where $\vert S \vert$ is the usually infinite cardinality of the state space S. Given a finite number of observations $\{x_{i}\}_{i=1}^{n}$ we can bound only finitely many entries of $p$, and cannot work with the infinite system of equations $Qp = 0$ when optimizing numerically.
+
+To address this issue we truncate the state space to a finite subset of states $E \subset S$, working with the truncated distribution $\{p(x)\}_{x \in E}$ and equations of $Qp = 0$ involving only those terms. In practice this amounts to choosing which equations from the infinite system $Qp = 0$ to include as constraints, and we will refer to this finite system of chosen equations as $Q_{E}p = 0$ (or simply as $Qp = 0$). Additionally, while $\{p(x)\}_{x \in S}$ is a probability distribution over $S$, the truncation $\{p(x)\}_{x \in E}$ is not necessarily a distribution over $E$. 
+
+Combining these conditions we obtain the constraint set $\mathcal{C}$, illustrated in figure [ref]:
+
+\begin{equation}
+    \mathcal{C} = \left\{
+    \begin{aligned}
+        & p \ge 0 , k_{j} \ge 0 \\
+        & j = 1, \ldots, m
+    \end{aligned}
+    \,\middle|\,
+    \begin{aligned}
+        & Q_{E}p = 0 \\
+        & \sum_{x \in E} p(x) \le 1 \\
+        & \hat{p}_{L} \le p \le \hat{p}_{U}
+    \end{aligned}
+    \right\}
+\end{equation}
+
+Optimizing for the minimum and maximum values of each reaction rate $k_{j}$ subject to the constraint set $\mathcal{C}$ produces the solution set:
+
+\begin{equation}
+    \hat{\Theta} = \left[\min_{\mathcal{C}} k_{1}, \max_{\mathcal{C}} k_{1} \right] \times \cdots \times \left[\min_{\mathcal{C}} k_{m}, \max_{\mathcal{C}} k_{m} \right]
+\end{equation}
+
+This is an estimate of the set of parameters which could have produced the observed data under the model, with statistical error guarantees due to the 95\% bootstrap confidence intervals used.  In general, the estimate $\hat{\Theta}$ will not give the true set of parameters that satisfy $\mathcal{C}$: 
+ $\Theta = \left\{ k_{j} \,\middle|\, k_{j} \in \mathcal{C} \right\}$ since it does not account for the dependence between the reaction rates, but as illustrated by \ref{fig:constraint_set} (b) satisfies $\Theta \subseteq \hat{\Theta}$.
+\begin{figure}
+\begin{tikzpicture}
+    % constraint set C
+    % label
+    \node [] at (0, 6) {(a)};
+    % axes
+    \draw [thick, ->] (0, 0) -- (0, 5);
+    \draw [thick, ->] (0, 0) -- (6, 0);
+    \node at (0, 5) [left] {$p(x)$};
+    \node at (6, 0) [below] {$k_{1}$};
+    % set
+    \draw plot[clip, smooth cycle, preaction={draw}] coordinates {
+    (1, 1) (2, 2) (3.5, 4.5) (5, 4) (4.5, 2.5) (5, 1) (4, 1) (3, 1.5) (2, 1) 
+    };
+    \begin{scope}
+        \clip (2, 2) rectangle (5, 3.9);
+        \fill [lightgray] plot[smooth cycle, preaction={draw}, fill=lightgray] coordinates {(1, 1) (2, 2) (3.5, 4.5) (5, 4) (4.5, 2.5) (5, 1) (4, 1) (3, 1.5) (2, 1)};
+    \end{scope}
+    \node at (3.5, 3) {$\mathcal{C}$};
+    % \draw [fill=red] (2, 2) -- (2, 3) -- (5, 3) -- (5, 2);
+    % maxima and minima lines and labels
+    \draw [dashed] (0, 2) -- (6, 2);
+    \draw [dashed] (0, 3.9) -- (6, 3.9);
+    \draw [dashed] [blue] (2, 0) -- (2, 5);
+    \draw [dashed] [blue] (5, 0) -- (5, 5);
+    \node at (0, 2) [left] {$\hat{p}_{L}(x)$};
+    \node at (0, 3.9) [left] {$\hat{p}_{U}(x)$};
+    \node at (2, 0) [below] {$\min\limits_{C} k_{1}$};
+    \node at (5, 0) [below] {$\max\limits_{C} k_{1}$};
+    \draw [ultra thick, |-|] [blue] (2, 0) -- (5, 0);
+    \node at (3.5, 0) [below] [blue] {$\hat{\Theta}$};
+    % intersection points
+    \node at (2, 2)[circle, fill, inner sep=1.5pt]{};
+    \node at (5, 3.9)[circle, fill, inner sep=1.5pt]{};
+    % solution set theta
+    % label
+    \node [] at (8, 6) {(b)};
+    % axes
+    \draw [thick, ->] (8, 0) -- (8, 5);
+    \draw [thick, ->] (8, 0) -- (14, 0);
+    \node at (8, 5) [left] {$k_{2}$};
+    \node at (14, 0) [below] {$k_{1}$};
+    % set
+    \draw plot[smooth cycle] coordinates {
+    (9, 2) (10, 2.5) (11, 4) (13, 2.5) (11, 1)
+    };
+    % maxima and minima lines and labels
+    \draw [dashed] [blue] (9, 0) -- (9, 5);
+    \draw [dashed] [blue] (13, 0) -- (13, 5);
+    \draw [dashed] [blue] (8, 1) -- (14, 1);
+    \draw [dashed] [blue] (8, 4) -- (14, 4);
+    \draw [thick] [blue] (9, 1) -- (9, 4);
+    \draw [thick] [blue] (13, 1) -- (13, 4);
+    \draw [thick] [blue] (9, 1) -- (13, 1);
+    \draw [thick] [blue] (9, 4) -- (13, 4);
+    \node at (9.5, 3) [blue] {$\hat{\Theta}$};
+    \node at (11, 2.5) {$\Theta$};
+    \node at (8, 1) [left] {$\min\limits_{C} k_{2}$};
+    \node at (8, 4) [left] {$\max\limits_{C} k_{2}$};
+    \node at (9, 0) [below] {$\min\limits_{C} k_{1}$};
+    \node at (13, 0) [below] {$\max\limits_{C} k_{1}$};
+    % intersection points
+    \node at (9, 2)[circle, fill ,inner sep=1.5pt]{};
+    \node at (11, 4)[circle, fill ,inner sep=1.5pt]{};
+    \node at (13, 2.5)[circle, fill ,inner sep=1.5pt]{};
+    \node at (11, 1)[circle, fill ,inner sep=1.5pt]{};
+\end{tikzpicture}
+\caption{$\textbf{Illustrations of a constraint set and solution set for the optimization problem.}$ (a) illustrates the constraint set $\mathcal{C}$ in a 2 dimensional space of stationary distribution value $p(x)$ and reaction rate $k_{1}$. The equations $Qp = 0$ and conditions on $p$ constrain the variables to the outlined region and, on observing data, the interval bounds $[\hat{p}_{L}(x), \hat{p}_{L}(x)]$ on $p(x)$ restrict to the shaded constraint set $\mathcal{C}$. The minimum and maximum values of $k_{1}$ within this set, marked in blue, produce the solution set $\hat{\Theta}$ of values of $k_{1}$ that are consistent with the observed data under the model. (b) illustrates how a solution set $\hat{\Theta} = \left[\min\limits_{\mathcal{C}} k_{1} , \max\limits_{\mathcal{C}} k_{1} \right] \times \left[\min\limits_{\mathcal{C}} k_{2} , \max\limits_{\mathcal{C}} k_{2} \right]$, outlined by the blue box, may in general differ from the true set of values $\Theta = \{ k_{1}, k_{2} \in \mathcal{C} \}$ outlined by the black curve.}
+\label{fig:constraint_set}
+\end{figure}
+
+\subsubsection{Linear Programming}
+
+The entries of the rate matrix Q are linear in the parameters $k_{j}$ so the the constraint $Qp = 0$ can be written as the sum $\sum_{j=1}^{m} k_{j} Q_{j} p = 0$ for constant matrices $Q_{j}$. Since $k_{j}$ and $p$ are both variables in the optimization problem this is a quadratic equality constraint meaning that optimization over the constraint set $\mathcal{C}$ is a non-convex problem which are difficult and slow to solve in general.
+
+By introducing the variables $z_{j}(x) = k_{j}p(x)$, written in vector form as $z_{j} = k_{j}p$, we can we can obtain a set of linear equality and inequality constraints:
+\begin{equation}
+    \mathcal{C}_\textrm{linear} = \left\{
+    \begin{aligned}
+    & z_{j} \ge 0 , k_{j} \ge 0 \\
+    & j = 1, \ldots , m
+    \end{aligned}
+    \,\middle|\,
+    \begin{aligned}
+        & \sum_{j=1}^{m} Q_{j}z_{j} = 0 \\
+        & \sum_{x \in E} z_{j}(x) \le k_{j} \\
+        & k_{j} \hat{p}_{L} \le z_{j} \le k_{j} \hat{p}_{U}
+    \end{aligned}
+    \right\}
+\end{equation}
+Since the objective function and constraints are linear in the variables $k_{j}$ and $z_{j}$ this is a linear program (LP), a special case of convex optimization which can be solved efficiently using standard methods such as the simplex algorithm to produce global optima [ref linear and nonlinear programming book] [or others].
+
+However, moving from $\mathcal{C}$ to $\mathcal{C}_{\text{linear}}$ we relax the constraints of the problem as the non-linear equality constraint $z_{j} = k_{j}p$ cannot be included in the linear program. As such, the linear program does not enforce linear dependence between the vector variables $z_{j}$ i.e. that the matrix $Z = [z_{1} , \ldots , z_{m}]$ has rank 1, so there is no guarantee that solutions will satisfy this constraint. In practice, given a solution the rank of $Z$ can be computed to assess how close the constraint is to being satisfied.
+
+\subsubsection{Marginal observations}
+
+In some situations we may not observe the full state of the system $x = (x_{1}, \ldots , x_{n}) \in S$ but only some of the species, for example consider production of a molecule that is controlled by an on / off switch where we observe the number of molecules but not the state of the switch. Without loss of generality assume we observe the first r species of n total and define $S_{i}$ as the state space of each species i so that $S := S_{1:n} = S_{1} \times \dots \times S_{n}$ is the full state space and we observe values in $S_{1:r}$.
+
+Given observations we can bootstrap to produce confidence interval bounds on the marginal of the stationary distribution $p(x_{1}, \ldots, x_{r})$, and using the law of total probability relate them to the (joint) stationary distribution $p(x_{1}, \ldots, x_{n})$:
+\begin{equation}
+    \mathbb{P}(X_{1} = x_{1}, \ldots , X_{r} = x_{r}) = \sum_{(x_{r+1}, \ldots, x_{n}) \in S_{r+1:n}} \mathbb{P}(X_{1} = x_{1}, \ldots , X_{n} = x_{n})
+\end{equation}
+Defining the column vector of the marginal distribution $\bar{p} = (p(x_{1}, \ldots, x_{r}))_{(x_{1}, \ldots, x_r) \in S_{1:r}}$, and analogously the vector of the joint distribution $p$, we can write this as $\bar{p} = Ap$ where $A$ is a matrix with entries $a_{ij} \in \{0, 1\}$ representing the sum.  The confidence interval bounds $\bar{p}_{L} \le \bar{p} \le \bar{p}_{U}$ on the marginal then give the constraints:
+\begin{equation}
+    \bar{p}^{L} \le Ap \le \bar{p}^{U} \quad , \quad k_{j} \bar{p}^{L} \le A z_{j} \le k_{j} \bar{p}^{U}
+\end{equation}
+which take the place of the existing bounds in $\mathcal{C}$ and $\mathcal{C}_{\textrm{linear}}$ 
+
+\subsubsection{State space truncation}
+
+Introducing a state space truncation relaxes the constraints of the optimization problem by reducing an infinite set of constraints to a finite set and so will widen the bounds produced. The choice of truncation E is therefore crucial and we will investigate how it affects solutions in various examples. 
+
+In general, a larger E gives tighter solution bounds at the cost of longer computation time due to the larger number of constraints. However, using too large of a truncation risks using CI estimates based on small numbers of observations. These estimates are more variable and more likely to not contain the true value $p(x)$ which can lead to infeasible problems or inaccurate solutions.
+
+% Additionally, the computation time to solve optimization problems scales with the number of constraints, so it is infeasible to include a large number of bounds, especially if they do not provide significant improvement.
+
+\subsubsection{Implementation}
+
+We use GUROBI [ref] to compute globally optimal solutions to non-convex optimization problems using the python API, and the python package cvxpy [ref] to solve linear programs using a selection of solvers (including GUROBI).
