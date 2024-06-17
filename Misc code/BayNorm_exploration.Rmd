@@ -1,0 +1,354 @@
+---
+title: "BayNorm exploration"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(BiocManager)
+library(bayNorm)
+```
+
+# BayNorm
+
+### Background
+
+We observe transcript counts for a range of genes inside cells. However, the current methods used to measure counts have a low 'capture efficiency': proportion of the true value recorded, meaning observed counts are much lower than their true values and can often be zero/missing (dropouts).
+
+The capture efficiency $\beta_{j}$ varies across cells j, but we assume that gene-specific effects are small (i.e. transcripts from any gene i have roughly proportion $\beta_{j}$ of being captured in cell j). The capture efficiency also varies between experiments, 'batch-effects', where different batches of cells have different capture rates due to many factors (environment, slight differences in experiment, time etc).
+
+### Method
+
+Use a bayesian approach to estimate posterior distribution of true/original transcript counts $x_{i,j}^{0}$.
+
+Prior: assume the true counts $x_{i,j}^{0}$ follow negative binomial distribution with parameters $\mu_i$, $\phi_i$ estimated using counts for gene i across all cells (or cells in the same batch: 'local')
+
+Likelihood: assume that the observed count $x_{i,j}$ follows a binomial distribution with N = $x_{i,j}^{0}$ and p = $\beta_j$ (natural choice: each transcript has chance $\beta_j$ of being observed)
+
+This gives the posterior as a shifted negative-binomial distribution.
+
+### Application
+
+Given the posterior distribution of the true counts $x_{i,j}^{0}$ for each gene i in each cells j there are several choices on how to proceed.
+
+(1) MAP: 'maximum a posteriori probability', take the mode of the posterior as estimate of the true count $x_{i,j}^{0}$ for all i, j. This produces a 'normalized' dataset of the same size as the original, and can be put directly into the same analysis pipeline (bootstrap, truncate state space, solve LP to bound).
+
+(2) mean of posterior: as above, an estimate of the true count for each observed count
+
+(3) sample from posterior: for each (i, j) sample S count values from the posterior e.g. S = 20. This produces a dataset of the same size as the observed counts BUT each entry is a list of S samples from the corresponding posterior. These could be considered just as artifical cells, giving a dataset of 20 * the number of original cells to analyse (?).
+
+# Estimating capture efficiencies: Beta
+
+Using example data and code provided in bayNorm documentation:
+
+```{r}
+data('EXAMPLE_DATA_list')
+rse <- SummarizedExperiment::SummarizedExperiment(
+  assays=S4Vectors::SimpleList(counts=EXAMPLE_DATA_list$inputdata[,seq(1,30)])
+)
+rse
+
+BETA_est<- bayNorm::BetaFun(Data=rse, MeanBETA = 0.06)
+summary(BETA_est$BETA)
+```
+### Method to estimate beta
+
+Set a value for the mean of $\beta$ = <$\beta$>, default 0.06 (i.e. average 6% capture efficiency). For each cell j sum the observed counts $x_{i,j}$ across all genes i (removing outliers and those with a high proportion of dropouts (zero values)), then normalise this vector to have mean = <$\beta$> giving $\beta$.
+
+# Real data
+
+Important to remove all missing values (NaN) otherwise the method will fail. Either drop genes/cells containing missing values, or preferably replace them by 0.
+
+```{r}
+# load cleaned datasets:
+# genes with mean expression < 1 and sig. # missing values have been removed
+data_cast_concat <- read.csv("C:/Users/willi/Documents/Year 4 Project Work/Final_data/data_cast_concat_cleaned.csv", row.names =  1)
+data_cast_mesc <- read.csv("C:/Users/willi/Documents/Year 4 Project Work/Final_data/data_cast_mesc_cleaned.csv", row.names =  1)
+data_c57_concat <- read.csv("C:/Users/willi/Documents/Year 4 Project Work/Final_data/data_c57_concat_cleaned.csv", row.names =  1)
+data_c57_mesc <- read.csv("C:/Users/willi/Documents/Year 4 Project Work/Final_data/data_c57_mesc_cleaned.csv", row.names =  1)
+
+# set all missing values to 0 (baynorm cannot accept missing values)
+data_cast_concat[is.na(data_cast_concat)] <- 0
+data_cast_mesc[is.na(data_cast_mesc)] <- 0
+data_c57_concat[is.na(data_c57_concat)] <- 0
+data_c57_mesc[is.na(data_c57_mesc)] <- 0
+
+# display
+head(data_cast_concat, 5)
+head(data_cast_mesc, 5)
+head(data_c57_concat, 5)
+head(data_c57_mesc, 5)
+```
+
+```{r}
+# estimate beta (capture efficiency)
+BETA_cast_concat <- bayNorm::BetaFun(Data=data_cast_concat, MeanBETA = 0.06)
+BETA_cast_mesc <- bayNorm::BetaFun(Data=data_cast_mesc, MeanBETA = 0.06)
+BETA_c57_concat <- bayNorm::BetaFun(Data=data_c57_concat, MeanBETA = 0.06)
+BETA_c57_mesc <- bayNorm::BetaFun(Data=data_c57_mesc, MeanBETA = 0.06)
+
+# display
+summary(BETA_cast_concat$BETA)
+summary(BETA_cast_mesc$BETA)
+summary(BETA_c57_concat$BETA)
+summary(BETA_c57_mesc$BETA)
+```
+```{r}
+# store capture efficiency estimates (beta)
+# (note: genes with high proportion of 0's + outliers are removed from calculation, those used are given in the "Selected_genes" list)
+#write.csv(BETA_cast_concat$BETA, "BETA_cast_concat.csv")
+#write.csv(BETA_cast_mesc$BETA, "BETA_cast_mesc.csv")
+#write.csv(BETA_c57_concat$BETA, "BETA_c57_concat.csv")
+#write.csv(BETA_c57_mesc$BETA, "BETA_c57_mesc.csv")
+```
+
+## Higher mean capture efficiency estimates
+
+```{r}
+# estimate beta with mean = 0.5
+BETA_cast_concat_50 <- bayNorm::BetaFun(Data=data_cast_concat, MeanBETA = 0.5)
+
+# estimate beta with mean = 0.9
+BETA_cast_concat_90 <- bayNorm::BetaFun(Data=data_cast_concat, MeanBETA = 0.9)
+
+
+# display
+summary(BETA_cast_concat_50$BETA)
+summary(BETA_cast_concat_90$BETA)
+```
+
+```{r}
+# store
+#write.csv(BETA_cast_concat_50$BETA, "BETA_cast_concat_50.csv")
+#write.csv(BETA_cast_concat_90$BETA, "BETA_cast_concat_90.csv")
+```
+
+# MAP and PS upscaled datasets
+
+```{r}
+# MAP of posterior for each data  entry
+bayNorm_2D_cast_concat <- bayNorm(
+    Data = data_cast_concat,
+    BETA_vec = NULL,
+    mode_version= TRUE,
+    mean_version = FALSE,
+    verbose = TRUE,
+    parallel = TRUE)
+bayNorm_2D_cast_mesc <- bayNorm(
+    Data = data_cast_mesc,
+    BETA_vec = NULL,
+    mode_version= TRUE,
+    mean_version = FALSE,
+    verbose = TRUE,
+    parallel = TRUE)
+bayNorm_2D_c57_concat <- bayNorm(
+    Data = data_c57_concat,
+    BETA_vec = NULL,
+    mode_version= TRUE,
+    mean_version = FALSE,
+    verbose = TRUE,
+    parallel = TRUE)
+bayNorm_2D_c57_mesc <- bayNorm(
+    Data = data_c57_mesc,
+    BETA_vec = NULL,
+    mode_version= TRUE,
+    mean_version = FALSE,
+    verbose = TRUE,
+    parallel = TRUE)
+```
+
+```{r}
+# extract MAP counts
+MAP_cast_concat <- data.frame(bayNorm_2D_cast_concat$Bay_out)
+MAP_cast_mesc <- data.frame(bayNorm_2D_cast_mesc$Bay_out)
+MAP_c57_concat <- data.frame(bayNorm_2D_c57_concat$Bay_out)
+MAP_c57_mesc <- data.frame(bayNorm_2D_c57_mesc$Bay_out)
+
+# display
+head(MAP_cast_concat, 5)
+head(MAP_cast_mesc, 5)
+head(MAP_c57_concat, 5)
+head(MAP_c57_mesc, 5)
+```
+
+The above dataframes show the upscaled/normalized data produced using the MAP of the posterior. Comparing to the observed counts dataframes above we see that counts have been generally increased, but not by simply globally scaling by a constant, instead using more information.
+
+```{r}
+# store
+#write.csv(MAP_cast_concat, "MAP_cast_concat.csv")
+#write.csv(MAP_cast_mesc, "MAP_cast_mesc.csv")
+#write.csv(MAP_c57_concat, "MAP_c57_concat.csv")
+#write.csv(MAP_c57_mesc, "MAP_c57_mesc.csv")
+```
+
+# Prior parameters
+
+Baynorm assumes a negative binomial prior distribution of true counts, estimating the mean and scale parameters from the data. The stationary distribution of true counts in the bursting model (with geometric bursts) is negative binomial, and equating parameters gives a (point) estimate of the geometric parameter and so the burst distribution.
+
+```{r}
+# prior parameters
+prior_cast_concat <- bayNorm_2D_cast_concat$PRIORS$MME_prior
+prior_cast_mesc <- bayNorm_2D_cast_mesc$PRIORS$MME_prior
+prior_c57_concat <- bayNorm_2D_c57_concat$PRIORS$MME_prior
+prior_c57_mesc <- bayNorm_2D_c57_mesc$PRIORS$MME_prior
+
+# display
+head(prior_cast_concat, 5)
+head(prior_cast_mesc, 5)
+head(prior_c57_concat, 5)
+head(prior_c57_mesc, 5)
+```
+```{r}
+# store
+#write.csv(prior_cast_concat, "prior_cast_concat.csv")
+#write.csv(prior_cast_mesc, "prior_cast_mesc.csv")
+#write.csv(prior_c57_concat, "prior_c57_concat.csv")
+#write.csv(prior_c57_mesc, "prior_c57_mesc.csv")
+```
+
+
+# Data analysis
+
+Compare the distribution of transcript counts for genes to the distribution of the normalized transcript counts (MAP estimates).
+
+```{r}
+# first gene
+par(mfrow=c(2,2))
+# histogram of observed counts
+hist(as.numeric(data_cast_concat[1,]), breaks=10, main="Observed Counts",
+     xlab = "transcript count")
+hist(as.numeric(data_cast_concat[1,]), breaks=100, main="Observed Counts",
+     xlab = "transcript count")
+# histogram of MAP counts
+hist(as.numeric(MAP_cast_concat[1,]), breaks=10, main="MAP Count Estimates",
+     xlab = "transcript count")
+hist(as.numeric(MAP_cast_concat[1,]), breaks=100, main="MAP Count Estimates",
+     xlab = "transcript count")
+```
+
+See that the general shape of the distribution remains the same, and still have a high proportion of counts = 0, but the counts are scaled to much higher values (max of ~150 from ~12) with many more unique count values.
+
+Even with an 'input' (observed count data) that has few counts with no observations, the 'output' (MAP count data) has several count values (in the range 0-150) with no observations. This could be an issue when directly using MAP data in the LP methods, since CI's for these states (count values) cannot be estimated (are [0, 0]) and so must be set to [0, 1].
+
+We plot comparisons of 'input' and 'output' distributions for a random selection of genes to see if this holds in general:
+
+```{r}
+set.seed(10)
+# number of genes
+n <- 5
+for (i in 1:n) {
+  par(mfrow=c(1,2))
+  # random gene
+  j <- sample.int(dim(data_cast_concat)[1], 1)
+  print(j)
+  # histogram of observed counts
+  hist(as.numeric(data_cast_concat[j,]), breaks=100, main="Observed Counts",
+       xlab = "transcript count")
+  # histogram of MAP counts
+  hist(as.numeric(MAP_cast_concat[j,]), breaks=100, main="MAP Count Estimates",
+       xlab = "transcript count")
+}
+```
+
+# Sample from posterior
+
+```{r}
+# S = 20 samples from posterior for each data  entry
+bayNorm_3D_cast_concat <- bayNorm(
+    Data=data_cast_concat,
+    BETA_vec = NULL,
+    mode_version=FALSE,
+    mean_version = FALSE,
+    S = 20,
+    verbose =TRUE,
+    parallel = TRUE)
+bayNorm_3D_cast_mesc <- bayNorm(
+    Data=data_cast_mesc,
+    BETA_vec = NULL,
+    mode_version=FALSE,
+    mean_version = FALSE,
+    S = 20,
+    verbose =TRUE,
+    parallel = TRUE)
+bayNorm_3D_c57_concat <- bayNorm(
+    Data=data_c57_concat,
+    BETA_vec = NULL,
+    mode_version=FALSE,
+    mean_version = FALSE,
+    S = 20,
+    verbose =TRUE,
+    parallel = TRUE)
+bayNorm_3D_c57_mesc <- bayNorm(
+    Data=data_c57_mesc,
+    BETA_vec = NULL,
+    mode_version=FALSE,
+    mean_version = FALSE,
+    S = 20,
+    verbose =TRUE,
+    parallel = TRUE)
+```
+
+```{r}
+# extract counts
+PS_cast_concat <- data.frame(bayNorm_3D_cast_concat$Bay_out)
+PS_cast_mesc <- data.frame(bayNorm_3D_cast_mesc$Bay_out)
+PS_c57_concat <- data.frame(bayNorm_3D_c57_concat$Bay_out)
+PS_c57_mesc <- data.frame(bayNorm_3D_c57_mesc$Bay_out)
+
+# new sample sizes
+print(dim(PS_cast_concat))
+print(dim(PS_cast_mesc))
+print(dim(PS_c57_concat))
+print(dim(PS_c57_mesc))
+
+# display
+head(PS_cast_concat, 5)
+head(PS_cast_mesc, 5)
+head(PS_c57_concat, 5)
+head(PS_c57_mesc, 5)
+```
+
+```{r}
+# store
+# write.csv(PS_cast_concat, "PS_cast_concat.csv")
+# write.csv(PS_cast_mesc, "PS_cast_mesc.csv")
+# write.csv(PS_c57_concat, "PS_c57_concat.csv")
+# write.csv(PS_c57_mesc, "PS_c57_mesc.csv")
+```
+
+
+```{r}
+# gene
+par(mfrow=c(2,2))
+j <- 1484
+# histogram of observed counts
+hist(as.numeric(data_cast_concat[j,]), breaks=10, main="Observed Counts",
+     xlab = "transcript count")
+# histogram of MAP counts
+hist(as.numeric(MAP_cast_concat[j,]), breaks=100, main="MAP Count Estimates",
+     xlab = "transcript count")
+# histogram of posterior sample counts
+hist(as.numeric(PS_cast_concat[j,]), breaks=100, main="Posterior Sample Counts",
+     xlab = "transcript count")
+hist(1)
+```
+
+# Misc. code
+
+```{r}
+# array from dataframe
+data_array <- array(
+  data = unlist(data_counts[seq(1,30),seq(1,30)]),
+  dim = dim(data_counts[seq(1,30),seq(1,30)]),
+  dimnames = list(
+    rownames(data_counts[seq(1,30),seq(1,30)]),
+    colnames(data_counts[seq(1,30),seq(1,30)])
+  )
+)
+
+# summarized experiment from array
+rse_data = SummarizedExperiment::SummarizedExperiment(
+  assays = list(counts = data_array),
+)
+rse_data
+```
