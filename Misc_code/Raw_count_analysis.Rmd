@@ -1,0 +1,86 @@
+---
+title: "Raw_count_analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ShortRead)
+library(BiocManager)
+library(bayNorm)
+```
+
+## Read files
+
+E-MTAB-6362.aggregated_filtered_counts.mtx Single-cell: RNA-seq expression matrix
+E-MTAB-6362.aggregated_filtered_counts.mtx_cols: Column names
+E-MTAB-6362.aggregated_filtered_counts.mtx_rows: Row names
+
+```{r}
+d <- Matrix::readMM("C:/Users/willi/Downloads/E-MTAB-6362-quantification-raw-files/E-MTAB-6362.aggregated_filtered_counts.mtx")
+
+col_names <- read.csv("C:/Users/willi/Downloads/E-MTAB-6362-quantification-raw-files/E-MTAB-6362.aggregated_filtered_counts.mtx_cols", header=FALSE)
+
+row_names <- read.csv("C:/Users/willi/Downloads/E-MTAB-6362-quantification-raw-files/E-MTAB-6362.aggregated_filtered_counts.mtx_rows", header = FALSE, sep = "\t")
+rownames(d) <- row_names[,1]
+colnames(d) <- col_names[,1]
+```
+
+# Write count matrix to CSV file
+
+```{r}
+# write.csv(as.matrix(d), "E-MTAB-6362-raw-counts.csv")
+```
+
+## Read normalized files
+
+E-MTAB-6362.aggregated_filtered_normalised_counts.mtx Single-cell: RNA-seq expression matrix
+E-MTAB-6362.aggregated_filtered_normalised_counts.mtx_cols: Column names
+E-MTAB-6362.aggregated_filtered_normalised_counts.mtx_rows: Row names
+
+```{r}
+d_norm <- Matrix::readMM("C:/Users/willi/Downloads/E-MTAB-6362-normalised-files/E-MTAB-6362.aggregated_filtered_normalised_counts.mtx")
+
+col_names_norm <- read.csv("C:/Users/willi/Downloads/E-MTAB-6362-normalised-files/E-MTAB-6362.aggregated_filtered_normalised_counts.mtx_cols", header=FALSE)
+
+row_names_norm <- read.csv("C:/Users/willi/Downloads/E-MTAB-6362-normalised-files/E-MTAB-6362.aggregated_filtered_normalised_counts.mtx_rows", header = FALSE, sep = "\t")
+rownames(d_norm) <- row_names_norm[,1]
+colnames(d_norm) <- col_names_norm[,1]
+```
+
+# Write count matrix to CSV file
+
+```{r}
+#   write.csv(as.matrix(d_norm), "E-MTAB-6362-normalised-counts.csv")
+```
+
+# Baynorm
+
+```{r}
+# load dataset
+data <- read.csv("C:/Users/willi/Documents/Year 4 Project Work/New_data/E-MTAB-6362-raw-counts.csv", row.names =  1)
+# no missing values
+data_counts[is.na(data_counts)]
+head(data, 5)
+```
+```{r}
+# estimate beta
+BETA_est<- bayNorm::BetaFun(Data=data_counts, MeanBETA = 0.06)
+summary(BETA_est$BETA)
+```
+```{r}
+# store capture efficiency estimates (beta), and genes (rows) they are based on
+# (as genes with high proportion of 0's + outliers are removed from calculation)
+# write.csv(BETA_est$BETA, "E-MTAB-6362-raw-counts-BETA.csv")
+length(BETA_est$Selected_genes)
+```
+```{r}
+# estimate beta: idealised version of higher mean
+BETA_est_ideal<- bayNorm::BetaFun(Data=data_counts, MeanBETA = 0.5)
+summary(BETA_est_ideal$BETA)
+```
+```{r}
+# store capture efficiency estimates
+# write.csv(BETA_est_ideal$BETA, "E-MTAB-6362-raw-counts-BETA-ideal.csv")
+```
+
